@@ -1,0 +1,29 @@
+# Data never goes in git
+data/*
+!data/README.md
+sample_data/
+*.raw
+*.nhdr
+*.nrrd
+*.npy
+*.npz
+*.nii
+*.nii.gz
+*.tif
+*.tiff
+*.jp2
+*.zarr/
+*.zst
+
+# Local work kept outside the shared repo for now
+research_notes/
+reports/
+poc_cube/
+
+# Python / Node / logs
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+*.log
