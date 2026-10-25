@@ -197,7 +197,7 @@ Corrections, bug reports and suggestions are very welcome. Please open an issue 
 <https://github.com/chrislinesamc/open-the-mind/issues>, with the output of `test/test.sh` (or the command that
 failed) if something does not work.
 
-## Credits and licence
+## Credits and license
 
 Created by Chrisline Sam C. The logo is an original drawing and the banner is a render from the viewer.
 
