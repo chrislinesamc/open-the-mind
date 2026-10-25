@@ -1,0 +1,16 @@
+# Python 3.10+ and an NVIDIA GPU (compute capability 7.5+). test/test.sh installs everything for the machine;
+# by hand, install torch and torchvision (Triton comes with them) from the PyTorch index matching the CUDA
+# version that nvidia-smi reports, then this file. The same index serves x86_64 and aarch64 (ARM) wheels.
+#   CUDA 13.x:   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+#   CUDA 12.8+:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   CUDA 12.6+:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#   pip install -r requirements.txt
+# Tested: torch 2.14.1 + triton 3.8.0 (cu130) on an RTX 5060 laptop (x86_64) and a GB10 (aarch64);
+#         torch 2.6.0 + triton 3.2.0 (cu124) on an A100.
+numpy>=2.5
+imagecodecs>=2026.8.16
+nvidia-ml-py            # live GPU readings on the page (without it the meter shows only torch's numbers)
+# tests and checks
+pytest
+zarr                    # reads the OME-Zarr output with a standard reader
+ome-zarr-models         # validates its OME metadata

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open the Mind</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  :root { --bg:#111; --panel:#1b1b1b; --fg:#ddd; --mute:#888; --acc:#e68c28; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font:13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #wrap { display:flex; height:100%; }
+  #view { flex:1; position:relative; overflow:hidden; cursor:grab; user-select:none; touch-action:none; }
+  #view.drag { cursor:grabbing; }
+  #frame { width:100%; height:100%; object-fit:contain; display:block; }
+  #meter { position:absolute; left:10px; top:8px; pointer-events:none; font-variant-numeric:tabular-nums;
+    background:rgba(0,0,0,.55); padding:4px 8px; border-radius:4px; }
+  #fps { font-size:18px; font-weight:600; color:var(--acc); }
+  #meter .m { color:var(--mute); font-size:12px; margin-left:8px; }
+  #sharp { position:absolute; right:10px; bottom:8px; color:var(--acc); font-size:12px; pointer-events:none;
+    background:rgba(0,0,0,.55); padding:3px 8px; border-radius:4px; }
+  #stats { position:absolute; left:10px; bottom:8px; color:var(--mute); font-size:12px; pointer-events:none;
+    font-variant-numeric:tabular-nums; }
+  #panel { width:280px; background:var(--panel); padding:14px 16px; overflow-y:auto; }
+  h1 { font-size:14px; margin:0 0 4px; }
+  .sub { color:var(--mute); font-size:12px; margin-bottom:6px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--acc); margin:16px 0 6px; }
+  label { display:block; margin:8px 0 2px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .row input[type=range] { flex:1; min-width:0; }
+  .val { width:44px; text-align:right; color:var(--mute); font-variant-numeric:tabular-nums; }
+  .chk { color:var(--mute); font-size:12px; }
+  select { flex:1; background:#2a2a2a; color:var(--fg); border:1px solid #3a3a3a; border-radius:4px; padding:3px 4px; font:inherit; }
+  button { margin-top:14px; background:#2a2a2a; color:var(--fg); border:1px solid #3a3a3a; padding:6px 10px; border-radius:4px; cursor:pointer; }
+  .help { color:var(--mute); font-size:12px; margin-top:14px; }
+  #mem { font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; }
+  #mem b { color:var(--fg); font-weight:500; }
+  #live { position:absolute; right:10px; top:8px; pointer-events:none; background:rgba(0,0,0,.62); padding:6px 9px 4px;
+    border-radius:4px; font-size:12px; font-variant-numeric:tabular-nums; width:340px; }
+  #live .t { color:var(--acc); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+  #live .r { display:grid; grid-template-columns:86px 92px 1fr; align-items:center; gap:6px; margin:2px 0; }
+  #live .k { color:var(--mute); }
+  #live .v { color:var(--fg); font-weight:600; text-align:right; }
+  #live canvas { width:100%; height:20px; display:block; }
+  #live .s { color:var(--mute); font-size:11px; grid-column:1 / -1; margin:-1px 0 3px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="view">
+    <canvas id="frame"></canvas>
+    <div id="meter"><span id="fps">connecting</span><span class="m" id="bw"></span><span class="m" id="lat"></span></div>
+    <div id="sharp" hidden>sharpening…</div>
+    <div id="live">
+      <div class="t">Live · GB10</div>
+      <div class="r"><span class="k">GPU load</span><span class="v" id="l_util">–</span><canvas id="g_util"></canvas></div>
+      <div class="s" id="l_util_s"></div>
+      <div class="r"><span class="k">GPU memory</span><span class="v" id="l_gpu">–</span><canvas id="g_gpu"></canvas></div>
+      <div class="s" id="l_gpu_s"></div>
+      <div class="r"><span class="k">System RAM</span><span class="v" id="l_ram">–</span><canvas id="g_ram"></canvas></div>
+      <div class="s" id="l_ram_s"></div>
+      <div class="r"><span class="k">Server render</span><span class="v" id="l_fps">–</span><canvas id="g_fps"></canvas></div>
+      <div class="s" id="l_fps_s"></div>
+    </div>
+    <div id="stats"></div>
+  </div>
+  <div id="panel">
+    <h1>Open the Mind</h1>
+    <div class="sub" id="meta">GPU-rendered on the server, streamed as JPEG</div>
+
+    <h2>Stream</h2>
+    <label>resolution (long side)</label>
+    <div class="row"><select id="res">
+      <option value="256">256 px — very slow link</option>
+      <option value="384">384 px</option>
+      <option value="512">512 px</option>
+      <option value="768">768 px</option>
+      <option value="1024">1024 px</option>
+      <option value="1280">1280 px</option>
+      <option value="1920">1920 px — LAN</option>
+      <option value="2560">2560 px — 1440p</option>
+      <option value="3840">3840 px — 4K (LAN, ~0.5–3 MB per frame)</option>
+    </select></div>
+    <label>while dragging</label>
+    <div class="row"><select id="prev">
+      <option value="auto">auto — follows the link</option>
+      <option value="1">same resolution</option>
+      <option value="0.5">1/2 resolution</option>
+      <option value="0.33">1/3 resolution</option>
+      <option value="0.25">1/4 resolution</option>
+    </select></div>
+    <label>JPEG quality</label>
+    <div class="row"><input type="range" id="q" min="20" max="95" step="1" value="70"><span class="val" id="q_v"></span></div>
+    <label>frames in flight (more = higher fps on a long link, more lag)</label>
+    <div class="row"><select id="win">
+      <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+    </select></div>
+
+    <h2>Open the brain</h2>
+    <label class="chk"><input type="checkbox" id="ox" checked> <span id="ox_l">coronal plane (A–P, x)</span></label>
+    <div class="row"><input type="range" id="cx" min="0" max="1" step="0.002" value="0.5"><span class="val" id="cx_v"></span><label class="chk"><input type="checkbox" id="fx"> flip</label></div>
+    <label class="chk"><input type="checkbox" id="oy" checked> <span id="oy_l">axial plane (S–I, y)</span></label>
+    <div class="row"><input type="range" id="cy" min="0" max="1" step="0.002" value="0.5"><span class="val" id="cy_v"></span><label class="chk"><input type="checkbox" id="fy"> flip</label></div>
+    <label class="chk"><input type="checkbox" id="oz" checked> <span id="oz_l">sagittal plane (L–R, z, section axis)</span></label>
+    <div class="row"><input type="range" id="cz" min="0" max="1" step="0.002" value="0.5"><span class="val" id="cz_v"></span><label class="chk"><input type="checkbox" id="fz"> flip</label></div>
+    <label class="chk"><input type="checkbox" id="mode" checked> open (untick to crop to the planes instead)</label>
+    <label class="chk"><input type="checkbox" id="auto" checked> opening faces the camera (untick: flip picks the side)</label>
+
+    <h2>Camera cut</h2>
+    <label class="chk"><input type="checkbox" id="cam"> cut facing the camera (follows rotation)</label>
+    <div class="row"><input type="range" id="camd" min="-1" max="1" step="0.002" value="0"><span class="val" id="camd_v"></span></div>
+
+    <h2>Rendering</h2>
+    <label>colour map</label>
+    <div class="row"><select id="colour">
+      <option value="0">grayscale</option>
+      <option value="1">sepia</option>
+      <option value="2">hot</option>
+      <option value="3">viridis</option>
+      <option value="4">magma</option>
+      <option value="5">bone</option>
+      <option value="6">violet stain</option>
+      <option value="7">custom (two colours)</option>
+    </select></div>
+    <div class="row" id="customrow" hidden><span class="chk">from</span><input type="color" id="c0" value="#000000">
+      <span class="chk">to</span><input type="color" id="c1" value="#ffffff"></div>
+    <canvas id="lutbar" width="256" height="1" style="width:100%;height:12px;display:block;margin-top:6px;border-radius:2px;image-rendering:pixelated"></canvas>
+    <label>gamma (left = brighter faint tissue)</label>
+    <div class="row"><input type="range" id="gamma" min="0.3" max="3" step="0.05" value="1"><span class="val" id="gamma_v"></span></div>
+    <label>window low</label>
+    <div class="row"><input type="range" id="lo" min="0" max="254" step="1" value="8"><span class="val" id="lo_v"></span></div>
+    <label>window high</label>
+    <div class="row"><input type="range" id="hi" min="1" max="255" step="1" value="200"><span class="val" id="hi_v"></span></div>
+    <label>density</label>
+    <div class="row"><input type="range" id="dens" min="0.02" max="6" step="0.02" value="1.5"><span class="val" id="dens_v"></span></div>
+    <label>cut-face opacity</label>
+    <div class="row"><input type="range" id="face" min="0" max="1" step="0.01" value="1"><span class="val" id="face_v"></span></div>
+    <label class="chk"><input type="checkbox" id="skip" checked> empty-space skipping (untick: background is loaded and marched too)</label>
+    <label>detail (level bias; left = sharper)</label>
+    <div class="row"><input type="range" id="lod" min="-2" max="3" step="0.25" value="0"><span class="val" id="lod_v"></span></div>
+
+    <h2>Memory (fixed, whatever the data size)</h2>
+    <label class="chk"><input type="checkbox" id="showlive" checked> show live RAM / GPU meter on the view</label>
+    <div id="mem">waiting for the server…</div>
+
+    <button id="reset">Reset view</button>
+    <div class="help">Drag: rotate · Shift/right-drag: pan · Wheel: zoom.<br>
+      One plane on opens a half, two a wedge, three a corner: the sagittal, coronal and axial faces.<br>
+      Grey box = tissue, orange box = opened region (kept region when cropping).</div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const sliders = ["cx", "cy", "cz", "camd", "lo", "hi", "dens", "face", "lod", "gamma"];
+const checks = ["ox", "oy", "oz", "fx", "fy", "fz", "cam", "mode", "auto", "skip"];
+const VIEW0 = {az: 35, el: 25, dist: 100, tx: 0, ty: 0, tz: 0};
+let view = {...VIEW0}, info = null, interacting = false, idleTimer = null;
+
+// stream settings are kept per browser, so a slow link stays on low resolution across reloads
+const STREAM = ["res", "prev", "q", "win"], STREAM0 = {res: "768", prev: "auto", q: "70", win: "2"};
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem("stream-settings") || "{}"); } catch (e) {}
+STREAM.forEach(k => { $(k).value = saved[k] || STREAM0[k]; if (!$(k).value) $(k).value = STREAM0[k]; });
+let autoScale = Math.min(1, Math.max(0.25, +saved.autoScale || 0.5));        // drag scale chosen by "auto"
+const saveStream = () => { try { localStorage.setItem("stream-settings", JSON.stringify({...Object.fromEntries(STREAM.map(k => [k, $(k).value])), autoScale})); } catch (e) {} };
+const dragScale = () => $("prev").value === "auto" ? autoScale : +$("prev").value;
+
+function state() {
+  const el = $("view"), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w0 = el.clientWidth * dpr, h0 = el.clientHeight * dpr;
+  // the chosen long side is rendered even above the screen's pixels (the browser then scales it down: supersampling)
+  const s = +$("res").value / Math.max(w0, h0) * (interacting ? dragScale() : 1);
+  const jq = +$("q").value;
+  const q = {...view, w: Math.max(64, Math.round(w0 * s)), h: Math.max(64, Math.round(h0 * s)),
+             q: interacting ? Math.max(20, jq - 15) : jq};
+  sliders.forEach(k => q[k] = +$(k).value);
+  checks.forEach(k => q[k] = $(k).checked ? 1 : 0);
+  q.colour = +$("colour").value;
+  q.c0 = parseInt($("c0").value.slice(1), 16);
+  q.c1 = parseInt($("c1").value.slice(1), 16);
+  return q;
+}
+
+// ---- meters: fps and bandwidth over the frames shown in the last 3 s; input-to-frame latency
+const WIN = 3000, shown = [], lats = [];
+function meter() {
+  const now = performance.now();
+  while (shown.length && now - shown[0][0] > WIN) shown.shift();
+  const n = shown.length, bytes = shown.reduce((s, f) => s + f[1], 0);
+  $("fps").textContent = n > 1 ? `${((n - 1) * 1000 / (shown[n - 1][0] - shown[0][0])).toFixed(1)} fps` : (wsOpen ? "idle" : $("fps").textContent);
+  $("bw").textContent = n ? `${(bytes * 8 / WIN / 1000).toFixed(2)} Mbit/s` : "";
+  while (lats.length && now - lats[0][0] > WIN) lats.shift();
+  if (lats.length) { const s = lats.map(l => l[1]).sort((a, b) => a - b); $("lat").textContent = `latency ${Math.round(s[s.length >> 1])} ms`; }
+  else $("lat").textContent = "";
+}
+setInterval(meter, 250);
+
+// ---- frames: draw the newest, drop stale ones
+const ctx = $("frame").getContext("2d");
+let drawnN = 0, lastSeqShown = -1;
+function draw(bmp, head, size) {
+  if (head.n <= drawnN) { bmp.close(); return; }
+  drawnN = head.n;
+  const c = $("frame");
+  if (c.width !== bmp.width || c.height !== bmp.height) { c.width = bmp.width; c.height = bmp.height; }
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  const now = performance.now();
+  shown.push([now, size]);
+  if (head.seq !== lastSeqShown && sentAt.has(head.seq)) { lats.push([now, now - sentAt.get(head.seq)]); lastSeqShown = head.seq; }
+  if (window.viewLog) viewLog.frames.push([now, head.seq, head.n, size, head.frame_ms, head.gpu_ms, head.w, head.h]);
+  $("stats").textContent = `${head.w}×${head.h} · ${(size / 1024).toFixed(0)} KB · kernel ${head.gpu_ms} ms · server frame ${head.frame_ms} ms` +
+    (head.misses ? ` · ${head.misses} bricks requested` : "");
+  $("sharp").hidden = !head.refining;
+  if (head.mem) showMem(head.mem);
+}
+let decodes = 0, queued = null;
+function show(blob, head) {                    // decode on the main thread (HTTP mode, or no worker)
+  if (decodes >= 2) { queued = [blob, head]; return; }
+  decodes++;
+  createImageBitmap(blob).then(bmp => draw(bmp, head, blob.size)).catch(() => {}).finally(() => {
+    decodes--;
+    if (queued) { const [b, h] = queued; queued = null; show(b, h); }
+  });
+}
+
+const gb = x => `${x.toFixed(2)} GB`;
+function showMem(m) {
+  $("mem").innerHTML =
+    `GPU brick pool <b>${gb(m.pool_gb)}</b> fixed · ${m.resident.toLocaleString()} / ${m.pool_slots.toLocaleString()} bricks resident (${m.pinned.toLocaleString()} pinned coarse)<br>` +
+    `GPU allocated <b>${gb(m.gpu_alloc_gb)}</b> · peak ${gb(m.gpu_peak_gb)}<br>` +
+    `host brick cache <b>${gb(m.host_cache_gb)}</b> of ${gb(m.host_cap_gb)} · staging ${gb(m.staging_gb)}<br>` +
+    `server process RSS <b>${gb(m.rss_gb)}</b><br>` +
+    `loaded ${m.loaded.toLocaleString()} bricks · ${gb(m.disk_bytes / 2 ** 30)} read from disk · ${m.evicted.toLocaleString()} evicted` +
+    (m.finest_level ? `<br>finest level capped at <b>L${m.finest_level}</b> (server --finest)` : "");
+}
+
+// ---- transport: WebSocket push; plain HTTP requests if the socket cannot open.
+// The socket lives in a worker that acknowledges each frame as soon as it arrives and decodes the JPEG off
+// the main thread, so a busy page (slider repaints, layout) never holds back the server's frame window.
+const WORKER = `
+let ws = null, decodes = 0, queued = null;
+function decode(blob, head) {
+  if (decodes >= 2) { queued = [blob, head]; return; }
+  decodes++;
+  createImageBitmap(blob).then(bmp => postMessage({type: "frame", head, size: blob.size, bmp}, [bmp])).catch(() => {})
+    .finally(() => { decodes--; if (queued) { const [b, h] = queued; queued = null; decode(b, h); } });
+}
+onmessage = e => {
+  const m = e.data;
+  if (m.type === "connect") {
+    ws = new WebSocket(m.url);
+    ws.binaryType = "arraybuffer";
+    ws.onopen = () => postMessage({type: "open"});
+    ws.onclose = () => postMessage({type: "close"});
+    ws.onmessage = ev => {
+      const n = new DataView(ev.data).getUint32(0, true);
+      const head = JSON.parse(new TextDecoder().decode(new Uint8Array(ev.data, 4, n)));
+      ws.send(JSON.stringify({type: "ack", n: head.n}));
+      decode(new Blob([new Uint8Array(ev.data, 4 + n)], {type: "image/jpeg"}), head);
+    };
+  } else if (m.type === "send" && ws && ws.readyState === 1) ws.send(m.data);
+};`;
+let worker = null;
+try { if (!/noworker/.test(location.search)) worker = new Worker(URL.createObjectURL(new Blob([WORKER], {type: "text/javascript"}))); } catch (e) { worker = null; }
+
+let ws = null, wsOpen = false, wsFails = 0, httpMode = false, seq = 0, pushQueued = false;
+const sentAt = new Map();
+const wsUrl = () => (location.protocol === "https:" ? "wss://" : "ws://") + location.host + location.pathname.replace(/[^/]*$/, "") + "ws";
+function opened() { wsOpen = true; wsFails = 0; drawnN = 0; push(); }      // frame numbers restart per connection
+function closed() {
+  const was = wsOpen; wsOpen = false;
+  if (!was && ++wsFails >= 2) { httpMode = true; $("fps").textContent = "HTTP mode"; push(); return; }
+  $("fps").textContent = "reconnecting"; setTimeout(connect, 1000);
+}
+function connect() {
+  if (worker) {
+    worker.onmessage = e => {
+      const m = e.data;
+      if (m.type === "frame") draw(m.bmp, m.head, m.size);
+      else if (m.type === "open") opened();
+      else if (m.type === "close") closed();
+    };
+    worker.postMessage({type: "connect", url: wsUrl()});
+    return;
+  }
+  ws = new WebSocket(wsUrl());
+  ws.binaryType = "arraybuffer";
+  ws.onopen = opened;
+  ws.onclose = closed;
+  ws.onmessage = e => {
+    const n = new DataView(e.data).getUint32(0, true);
+    const head = JSON.parse(new TextDecoder().decode(new Uint8Array(e.data, 4, n)));
+    ws.send(JSON.stringify({type: "ack", n: head.n}));
+    show(new Blob([new Uint8Array(e.data, 4 + n)], {type: "image/jpeg"}), head);
+  };
+}
+function push() {                              // send the current view, at most once per animation frame
+  if (pushQueued) return;
+  pushQueued = true;
+  requestAnimationFrame(() => {
+    pushQueued = false;
+    seq++;
+    const now = performance.now();
+    sentAt.set(seq, now);
+    if (sentAt.size > 600) sentAt.delete(sentAt.keys().next().value);
+    if (window.viewLog) viewLog.sends.push([seq, now]);
+    if (httpMode) return httpRequest(seq);
+    if (!wsOpen) return;
+    const msg = JSON.stringify({type: "view", seq, window: +$("win").value, view: state()});
+    if (worker) worker.postMessage({type: "send", data: msg}); else ws.send(msg);
+  });
+}
+
+// "auto" while dragging: shrink the frame when frames fall behind the views sent or queue on the link
+// (latency above this link's own floor), grow it back while the link keeps up. Comparing with the views
+// sent means slow mouse moves don't count as a slow link; using the floor means a long VPN round trip doesn't.
+let dragStart = 0, behind = 0, minLat = Infinity;
+setInterval(() => {
+  const now = performance.now();
+  if ($("prev").value !== "auto" || !interacting || now - dragStart < 600) return;   // the first frames of a drag always lag
+  let sent = 0;
+  sentAt.forEach(t => { if (now - t < 1000) sent++; });
+  const got = shown.filter(f => now - f[0] < 1000).length;
+  const l = lats.filter(x => now - x[0] < 1000).map(x => x[1]).sort((a, b) => a - b);
+  const med = l.length ? l[l.length >> 1] : 0;
+  if (sent < 5 || !l.length) return;
+  minLat = Math.min(minLat * 1.01 + 0.5, med);          // round-trip floor of this link, slowly forgotten
+  const queueing = med - minLat;                         // delay added by frames waiting on the link
+  behind = got < 0.75 * sent || queueing > 40 ? behind + 1 : 0;
+  if (behind >= 2) { autoScale = Math.max(0.25, autoScale * 0.85); behind = 0; }
+  else if (got > 0.9 * sent && queueing < 15) autoScale = Math.min(1, autoScale * 1.1);
+  saveStream();
+}, 500);
+let httpBusy = false, httpPending = false, httpN = 0;
+async function httpRequest(s) {
+  if (httpBusy) { httpPending = true; return; }
+  httpBusy = true;
+  try {
+    const r = await fetch("render?" + new URLSearchParams(state()));
+    const head = JSON.parse(r.headers.get("X-Stats"));
+    head.seq = s;
+    head.n = ++httpN;
+    show(await r.blob(), head);
+  } catch (e) { $("stats").textContent = "error: " + e; }
+  httpBusy = false;
+  if (httpPending) { httpPending = false; push(); }
+}
+
+function changed(fromDrag) {
+  if (fromDrag && !interacting) { interacting = true; dragStart = performance.now(); }
+  push();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (interacting) { interacting = false; push(); } }, 250);
+}
+
+sliders.forEach(k => {
+  const upd = () => $(k + "_v").textContent = (+$(k).value).toFixed(k === "lo" || k === "hi" ? 0 : 2);
+  upd(); $(k).addEventListener("input", () => { upd(); changed(true); });
+});
+checks.forEach(k => $(k).addEventListener("change", () => changed(false)));
+const qv = () => $("q_v").textContent = $("q").value;
+qv(); $("q").addEventListener("input", () => { qv(); saveStream(); changed(false); });
+["res", "prev", "win"].forEach(k => $(k).addEventListener("change", () => { saveStream(); changed(false); }));
+// colour map: the frame updates with the next render; the bar shows the server's table for the current settings
+async function lutBar() {
+  $("customrow").hidden = $("colour").value !== "7";
+  const q = new URLSearchParams({colour: $("colour").value, gamma: $("gamma").value,
+                                 c0: parseInt($("c0").value.slice(1), 16), c1: parseInt($("c1").value.slice(1), 16)});
+  try {
+    const m = await (await fetch("lut?" + q)).json(), g = $("lutbar").getContext("2d"), img = g.createImageData(256, 1);
+    m.rgb.forEach(([r, gr, b], i) => img.data.set([r, gr, b, 255], 4 * i));
+    g.putImageData(img, 0, 0);
+  } catch (e) {}
+}
+["colour", "c0", "c1"].forEach(k => $(k).addEventListener("input", () => { lutBar(); changed(false); }));
+$("gamma").addEventListener("input", lutBar);
+lutBar();
+
+// ---- orbit, pan (in the camera plane), zoom
+function basis() {
+  const az = view.az * Math.PI / 180, el = view.el * Math.PI / 180;
+  const f = [-Math.cos(el) * Math.sin(az), Math.sin(el), -Math.cos(el) * Math.cos(az)];   // eye -> target
+  let r = [f[1] * 0 - f[2] * -1, f[2] * 0 - f[0] * 0, f[0] * -1 - f[1] * 0];                 // f x (0,-1,0)
+  const rn = Math.hypot(...r) || 1; r = r.map(x => x / rn);
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  return {r, u};
+}
+const v = $("view");
+let drag = null;
+v.addEventListener("contextmenu", e => e.preventDefault());
+v.addEventListener("pointerdown", e => { drag = {x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2};
+  v.setPointerCapture(e.pointerId); v.classList.add("drag"); });
+v.addEventListener("pointerup", () => { drag = null; v.classList.remove("drag"); });
+v.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.pan) {
+    const s = 2 * view.dist * Math.tan(Math.PI / 12) / v.clientHeight, {r, u} = basis();
+    view.tx -= (r[0] * dx - u[0] * dy) * s; view.ty -= (r[1] * dx - u[1] * dy) * s; view.tz -= (r[2] * dx - u[2] * dy) * s;
+  } else {
+    view.az += dx * 0.4;
+    view.el = Math.max(-89, Math.min(89, view.el + dy * 0.4));
+  }
+  changed(true);
+});
+v.addEventListener("wheel", e => { e.preventDefault();
+  const far = info ? info.default_dist * 4 : 1000;
+  view.dist = Math.max(0.2, Math.min(far, view.dist * Math.exp(e.deltaY * 0.0012))); changed(true); }, {passive: false});
+$("reset").addEventListener("click", () => { view = {...VIEW0, dist: info ? info.default_dist : VIEW0.dist}; changed(false); });
+window.addEventListener("resize", () => changed(false));
+
+// ---- live machine meter: /stats every 0.5 s (RAM, GPU, server frame rate), one-minute graphs
+const LIVE_N = 120, live = [];
+let liveSince = 0, livePeak = {}, livePool = 0;
+function spark(id, key, max, colour) {
+  const c = $(id), dpr = window.devicePixelRatio || 1, w = c.clientWidth * dpr, h = c.clientHeight * dpr;
+  if (!w) return;
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "rgba(255,255,255,.06)"; g.fillRect(0, 0, w, h);
+  const pts = live.map(s => s[key]).filter(v => v != null);
+  if (pts.length < 2) return;
+  g.beginPath();
+  pts.forEach((v, i) => { const x = w * (i + LIVE_N - pts.length) / (LIVE_N - 1), y = h - 1 - (h - 2) * Math.min(v / max, 1);
+    i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.strokeStyle = colour; g.lineWidth = 1.5 * dpr; g.stroke();
+  g.lineTo(w, h); g.lineTo(w * (LIVE_N - pts.length) / (LIVE_N - 1), h); g.closePath();
+  g.fillStyle = colour.replace("rgb", "rgba").replace(")", ",.18)"); g.fill();
+}
+function showLive() {
+  const s = live[live.length - 1];
+  if (!s) return;
+  $("l_util").textContent = s.gpu_util == null ? "n/a" : `${s.gpu_util} %`;
+  $("l_util_s").textContent = s.power_w == null ? "" : `${s.power_w} W · ${s.temp_c} °C`;
+  $("l_gpu").textContent = gb(s.gpu_proc_gb);
+  $("l_gpu_s").textContent = `this server · pool ${gb(livePool)} fixed · peak ${gb(livePeak.gpu_proc_gb || 0)}`;
+  $("l_ram").textContent = `${s.ram_used_gb.toFixed(1)} / ${s.ram_total_gb.toFixed(0)} GB`;
+  $("l_ram_s").textContent = `whole machine, incl. GPU · server CPU ${gb(s.rss_gb)} · peak ${(livePeak.ram_used_gb || 0).toFixed(1)}`;
+  $("l_fps").textContent = `${s.server_fps} fps`;
+  $("l_fps_s").textContent = `frames in the last second · kernel ${s.gpu_ms} ms`;
+  spark("g_util", "gpu_util", 100, "rgb(230,140,40)");
+  spark("g_gpu", "gpu_proc_gb", Math.max(livePool * 1.25, livePeak.gpu_proc_gb || 0, 1), "rgb(120,180,255)");
+  spark("g_ram", "ram_used_gb", s.ram_total_gb, "rgb(140,210,140)");
+  spark("g_fps", "server_fps", Math.max(60, ...live.map(x => x.server_fps)), "rgb(220,220,220)");
+}
+let liveBusy = false;
+async function pollLive() {
+  if (liveBusy || !$("showlive").checked) return;
+  liveBusy = true;
+  try {
+    const m = await (await fetch("stats?since=" + liveSince)).json();
+    livePeak = m.peak; livePool = m.pool_gb;
+    for (const s of m.samples) { live.push(s); liveSince = s.t; }
+    while (live.length > LIVE_N) live.shift();
+    showLive();
+  } catch (e) {}
+  liveBusy = false;
+}
+setInterval(pollLive, 500);
+$("showlive").addEventListener("change", () => { $("live").hidden = !$("showlive").checked; pollLive(); });
+
+fetch("info").then(r => r.json()).then(m => {
+  info = m;
+  view.dist = VIEW0.dist = m.default_dist;
+  const [nk, nj, ni] = m.shape_kji, [sk, sj] = m.spacing_mm_kji;
+  if (m.planes) ["x", "y", "z"].forEach(a => { if (m.planes[a]) $("o" + a + "_l").textContent = m.planes[a]; });
+  $("meta").textContent = `${m.name}: ${ni}×${nj}×${nk} voxels · ${sj * 1000}×${sj * 1000}×${sk * 1000} µm · ${m.levels} levels · GPU-rendered, JPEG-streamed`;
+  showMem(m.memory);
+  connect();
+});
+</script>
+</body>
+</html>

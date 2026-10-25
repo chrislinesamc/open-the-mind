@@ -14,6 +14,11 @@ sample_data/
 *.jp2
 *.zarr/
 *.zst
+*.zip
+*.part
+
+# Transfer note that came with the data package (not part of the project)
+/README.txt
 
 # Local work kept outside the shared repo for now
 research_notes/
@@ -27,3 +32,7 @@ __pycache__/
 venv/
 node_modules/
 *.log
+.pytest_cache/
+
+# Session handoff notes (local only)
+HANDOFF.md

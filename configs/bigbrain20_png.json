@@ -1,0 +1,25 @@
+{
+ "name": "bigbrain20_png",
+ "png_dir": "data/bigbrain20_png",
+ "png_pattern": "pm{:04d}o.png",
+ "png_first": 1,
+ "invert": true,
+ "dtype": "uint8",
+ "shape_kji": [
+  7404,
+  5711,
+  6572
+ ],
+ "spacing_mm_kji": [
+  0.02,
+  0.021166666666666667,
+  0.021166666666666667
+ ],
+ "axes": "k = coronal section number (pm0001..pm7404), j = image row (superior -> inferior), i = image column; intensities inverted (255 - v), background is 0",
+ "planes": {
+  "x": "sagittal plane (L–R, x)",
+  "y": "axial plane (S–I, y)",
+  "z": "coronal plane (A–P, z, section axis)"
+ },
+ "source": "https://ftp.bigbrainproject.org/bigbrain-ftp/BigBrainRelease.2015/2D_Final_Sections/Coronal/Png/Full_Resolution/"
+}
