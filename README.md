@@ -9,10 +9,29 @@
 </p>
 
 <p align="center">
+  🏆 Winning project of the <a href="https://tfunck.github.io/bigbrainhack2026/">BigBrain Hackathon 2026</a>
+  (18–19 October 2026, The Neuro, Montréal).
+</p>
+
+<p align="center">
   <img src="docs/brand/banner.png" alt="Whole brain rendered on the server GPU, with the octant facing the camera cut away" width="720">
 </p>
 
 ---
+
+## BigBrain Hackathon 2026
+
+Open the Mind was built at the [BigBrain Hackathon 2026](https://tfunck.github.io/bigbrainhack2026/), held on
+18–19 October 2026 at The Neuro (Montreal Neurological Institute) just before the 10th BigBrain Workshop. It was
+voted the winning project by the workshop participants, and won the hackathon's prize: a Dell Pro Max with NVIDIA
+GB10.
+
+<p align="center">
+  <img src="docs/brand/bigbrain_hack_winning_moment.jpeg" alt="Chrisline Sam C receiving the Dell Pro Max with NVIDIA GB10 prize from the organisers, Gregory Kiar and Thomas Funck, at the BigBrain Hackathon 2026" width="600">
+</p>
+<p align="center">
+  <em>Receiving the Dell Pro Max with NVIDIA GB10 from the organisers, Gregory Kiar and Thomas Funck.</em>
+</p>
 
 ## The problem
 
@@ -168,7 +187,13 @@ web/          browser page
 - **Proof of flat memory:** on the GB10, the same 30 s flight runs at 60 fps with GPU memory fixed at the pool size from 26 GB to 278 GB of data, even with a 4 GB pool (`scripts/stream_bench.py`, table in `server/README.md`).
 - **Tests:** `python -m pytest tests/ -q` (synthetic data, no download needed).
 
+## Feedback
+
+Corrections, bug reports and suggestions are very welcome. Please open an issue at
+<https://github.com/chrislinesamc/open-the-mind/issues>, with the output of `test/test.sh` (or the command that
+failed) if something does not work.
+
 ## Credits and licence
 
-The logo is an original drawing. The banner is a render from the viewer. A licence for the code has not been
-chosen yet.
+Created by Chrisline Sam C. The logo is an original drawing and the banner is a render from the viewer. A licence
+for the code has not been chosen yet.
