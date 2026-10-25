@@ -107,6 +107,10 @@ Steps that are already done are skipped, so after an interruption just run it ag
 | `test/test.sh png` | The whole brain as its 7,404 coronal PNG thumbnails (500 × 434 pixels, 20 µm apart) | 0.43 GB |
 | `test/test.sh slab` | 64 full-resolution sections (6572 × 5711 pixels, 20 µm) from the middle of the brain | 0.9 GB |
 
+**In Docker:** the viewer listens on all interfaces (`0.0.0.0`) by default, so inside a container it only needs the
+GPU and the port passed through, e.g. `docker run --gpus all -p 1729:1729 ...`, then open `http://<docker host>:1729/`.
+`BIND=127.0.0.1 test/test.sh` limits it to the local machine instead.
+
 On an RTX 5060 laptop GPU, each converts in under a minute, and the viewer runs a 1080p camera flight at 60 fps in
 1.5 GB of RAM and 1.4 GB of GPU memory. Settings such as the port and the memory budgets are environment variables,
 listed at the top of `test/test.sh` (e.g. `PORT=8080 test/test.sh`).
@@ -195,5 +199,7 @@ failed) if something does not work.
 
 ## Credits and licence
 
-Created by Chrisline Sam C. The logo is an original drawing and the banner is a render from the viewer. A licence
-for the code has not been chosen yet.
+Created by Chrisline Sam C. The logo is an original drawing and the banner is a render from the viewer.
+
+Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (see `LICENSE.md`): free to use, share
+and adapt for non-commercial purposes, with credit.

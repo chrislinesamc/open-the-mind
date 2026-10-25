@@ -12,6 +12,8 @@
 #   slab   64 full-resolution 20 um sections from the middle of the brain (6572 x 5711, 0.9 GB)
 # settings (environment variables, defaults in brackets):
 #   PORT [1729]  VENV [.venv]
+#   BIND [0.0.0.0]              address the viewer listens on: 0.0.0.0 = all interfaces (needed inside Docker,
+#                               with the port published, e.g. docker run --gpus all -p 1729:1729 ...); 127.0.0.1 = this machine only
 #   MEM_GB [2]                  RAM and GPU memory budget (each) of the conversion
 #   POOL_GB [1]  HOST_GB [0.5]  GPU brick pool and host brick cache of the viewer (under 2 GB VRAM and 2 GB RAM)
 #   SECTIONS [64]  FIRST [3700] sections of the slab test
@@ -23,6 +25,7 @@ MODE=${1:-nifti}
 SECTIONS=${SECTIONS:-64}
 FIRST=${FIRST:-3700}
 PORT=${PORT:-1729}
+BIND=${BIND:-0.0.0.0}
 VENV=${VENV:-.venv}
 POOL_GB=${POOL_GB:-1}
 HOST_GB=${HOST_GB:-0.5}
@@ -163,7 +166,12 @@ fi
 
 step "6/6 starting the viewer"
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-echo "open  http://localhost:$PORT/${IP:+   (from another machine: http://$IP:$PORT/)}"
+if [ "$BIND" = 0.0.0.0 ]; then
+    echo "open  http://localhost:$PORT/${IP:+   (from another machine: http://$IP:$PORT/)}"
+    [ -f /.dockerenv ] && echo "      inside Docker: publish the port (docker run -p $PORT:$PORT ...) and open http://<docker host>:$PORT/"
+else
+    echo "open  http://$BIND:$PORT/"
+fi
 echo "stop  Ctrl+C"
-exec "$VPY" server/app.py "$ZARR" "$PORT" 0.0.0.0 --pool-gb "$POOL_GB" --host-gb "$HOST_GB" \
+exec "$VPY" server/app.py "$ZARR" "$PORT" "$BIND" --pool-gb "$POOL_GB" --host-gb "$HOST_GB" \
     --staging-mb 64 --threads 8 --pin-share 0.25
