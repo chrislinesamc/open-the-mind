@@ -1,3 +1,5 @@
+Open the Mind © 2026 by Chrisline Sam C is licensed under CC BY-NC 4.0.
+
 Attribution-NonCommercial 4.0 International
 
 =======================================================================
